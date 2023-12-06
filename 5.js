@@ -2,83 +2,100 @@ import fs from 'fs/promises';
 
 const test = false;
 const filePath = test ? '5.input.test.txt' : '5.input.txt';
-let file = await fs.readFile(filePath, 'utf-8');
+const file = await fs.readFile(filePath, 'utf-8');
+const lines = file.split('\n');
 
-const [seedsString, ...mapStrings] = file.split('\n\n');
+const seeds = lines[0].split(' ').map(Number).filter(Boolean);
 
-// seeds
-const seeds = seedsString.replace('seeds: ', '').split(' ').map(Number);
+const maps = [];
 
-let mappings = [];
-for (let i = 0; i < mapStrings.length; i++) {
-  const mapLines = mapStrings[i].split('\n');
-  let ranges = [];
-  for (let j = 1; j < mapLines.length; j++) {
-    const [toStart, fromStart, range] = mapLines[j].split(' ').map(Number);
-    ranges.push({
-      fromStart,
-      fromEnd: fromStart + range,
-      offset: toStart - fromStart,
-    });
+// Start at the mappings
+let i = 2;
+while (i < lines.length) {
+  // skip the title
+  maps.push([]);
+  i++;
+  while (i < lines.length && lines[i] !== '') {
+    const line = lines[i].split(' ').map(Number);
+    maps[maps.length - 1].push(line);
+    i++;
   }
-  mappings.push(ranges);
-}
-
-function trackSeed(seed) {
-  let value = seed;
-  for (let i = 0; i < mappings.length; i++) {
-    for (let j = 0; j < mappings[i].length; j++) {
-      const { fromStart, fromEnd, offset } = mappings[i][j];
-      // if in range, update value with the toStart value + the difference between the fromStart and the value
-      if (value >= fromStart && value <= fromEnd) {
-        value = value + offset;
-        break;
-      }
-    }
-  }
-  return value;
+  // sort by the from column
+  maps[maps.length - 1].sort((a, b) => a[1] - b[1]);
+  i++;
 }
 
 /**
  * Part 1 - Array of seeds
  * @returns {number} lowest location
  */
-async function part1() {
-  let location = Infinity;
-  for (let i = 0; i < seeds.length; i++) {
-    const newLocation = trackSeed(seeds[i]);
-    if (newLocation < location) {
-      location = newLocation;
+function part1() {
+  let locations = [];
+  for (const seed of seeds) {
+    let location = seed;
+    // if its not in any mappings, then it's the last defined location
+    for (const map of maps) {
+      for (const [to, from, range] of map) {
+        const isInFromRange = location >= from && location <= from + range;
+        if (isInFromRange) {
+          location = to + (location - from);
+          break;
+        }
+      }
     }
+    locations.push(location);
   }
-
-  console.log('Part 1 result:', location, ', test:', test);
-  return location;
+  const lowestLocation = Math.min(...locations);
+  return lowestLocation;
 }
 
-part1();
+console.log({ 'Part 1': part1() });
 
 /**
- * Part 2 - Range of seeds. This does take 5+ minutes to run.
- * OK BYEEEEEEE!
+ * Part 2 - Range of seedRanges.
  * @returns {number} lowest location
  */
 function part2() {
-  let lowestLocation = Infinity;
-
+  let seedRanges = [];
   for (let i = 0; i < seeds.length; i += 2) {
-    // The range of seeds is from seeds[i] to seeds[i+1] inclusive
-    for (let j = seeds[i]; j <= seeds[i] + seeds[i + 1]; j++) {
-      const location = trackSeed(j); // Get the final location for the seed
+    seedRanges.push([seeds[i], seeds[i] + seeds[i + 1]]);
+  }
 
-      // If the location is lower than any seen so far, update lowestLocation
-      if (location < lowestLocation) {
-        lowestLocation = location;
-        console.log('lowestLocation:', lowestLocation);
+  for (let map of maps) {
+    let newSeeds = [];
+    while (seedRanges.length > 0) {
+      let isInRange = false;
+
+      const [seedRangeStart, seedRangeEnd] = seedRanges.pop();
+
+      for (const [rangeTo, rangeFrom, range] of map) {
+        let minRangeInMap = Math.max(seedRangeStart, rangeFrom);
+        let maxRangeInMap = Math.min(seedRangeEnd, rangeFrom + range);
+
+        if (minRangeInMap < maxRangeInMap) {
+          isInRange = true;
+          newSeeds.push([minRangeInMap - rangeFrom + rangeTo, maxRangeInMap - rangeFrom + rangeTo]);
+
+          // possible ranges
+          if (minRangeInMap > seedRangeStart) {
+            seedRanges.push([seedRangeStart, minRangeInMap]);
+          }
+
+          if (seedRangeEnd > maxRangeInMap) {
+            seedRanges.push([maxRangeInMap, seedRangeEnd]);
+          }
+          break;
+        }
+      }
+      if (!isInRange) {
+        newSeeds.push([seedRangeStart, seedRangeEnd]);
       }
     }
+    seedRanges = newSeeds;
   }
-  console.log('Part 2 result:', lowestLocation, ', test:', test);
+
+  const lowestLocation = Math.min(...seedRanges.map(([s, e]) => s));
   return lowestLocation;
 }
-part2();
+
+console.log({ 'Part 2': part2() });
