@@ -8,30 +8,73 @@ const lines = file.split('\n');
 
 const cardsInOrder = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
 
-function calculateHand(hand) {
-  const cards = hand
-    .split('')
-    .sort((a, b) => cardsInOrder.indexOf(a) - cardsInOrder.indexOf(b))
-    .map((card) => card.trim());
-  console.log('cards:', cards);
-  const highestCards = cards[0];
+function isEq(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
-  switch (cards) {
-    /* Five of a kind, where all five cards have the same label: AAAAA */
-    case cards.every((card) => card === cards[0]): {
+function getCardInOrderValue(card) {
+  return cardsInOrder.indexOf(card);
+}
+
+function sortByCardsInOrder(a, b) {
+  for (let i = 0; i < a.hand.length; i++) {
+    if (a.hand[i] !== b.hand[i]) {
+      return getCardInOrderValue(a.hand[i]) - getCardInOrderValue(b.hand[i]);
     }
-
-    /* Four of a kind, where four cards have the same label and one card has a different label: AA8AA */
-    /* Full house, where three cards have the same label, and the remaining two cards share a different label: 23332 */
-    /* Three of a kind, where three cards have the same label, and the remaining two cards are each different from any other card in the hand: TTT98 */
-    /* Two pair, where two cards share one label, two other cards share a second label, and the remaining card has a third label: 23432 */
-    /* One pair, where two cards share one label, and the other three cards have a different label from the pair and each other: A23A4 */
-    /* High card, where all cards' labels are distinct: 23456 */
   }
 }
 
-lines.forEach((line) => {
-  const [hand, score] = line.split(' ');
+function calculateHandScore(hand) {
+  const counts = Object.values(
+    hand.split('').reduce((acc, card) => {
+      acc[card] = acc[card] ? acc[card] + 1 : 1;
+      return acc;
+    }, {}),
+  ).sort();
 
-  console.log({ hand, score, result: calculateHand(hand) });
+  if (isEq(counts, [5])) {
+    return 7;
+  }
+  if (isEq(counts, [1, 4])) {
+    return 6;
+  }
+  if (isEq(counts, [2, 3])) {
+    return 5;
+  }
+  if (isEq(counts, [1, 1, 3])) {
+    return 4;
+  }
+  if (isEq(counts, [1, 2, 2])) {
+    return 3;
+  }
+  if (isEq(counts, [1, 1, 1, 2])) {
+    return 2;
+  }
+  return 1;
+}
+
+const hands = lines.map((line) => {
+  const [hand, bid] = line.split(' ');
+  const handScore = calculateHandScore(hand);
+
+  return {
+    bid,
+    hand: hand.split(''),
+    handScore,
+  };
 });
+
+const sortedHands = hands.sort((a, b) => {
+  // If the hand scores are equal,
+  // sort by the cards in order of value
+  if (a.handScore === b.handScore) {
+    return sortByCardsInOrder(a, b);
+  }
+  return a.handScore - b.handScore;
+});
+
+const part1Total = sortedHands.reduce((acc, hand, index) => {
+  return acc + hand.bid * (index + 1);
+}, 0);
+
+console.log('Part 1:', part1Total);
